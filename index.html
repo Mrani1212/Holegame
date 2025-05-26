@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Hole.io Clone</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <style>
+        canvas {
+            border: 2px solid black;
+            background: #87CEEB;
+            touch-action: none;
+        }
+        body {
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+    </style>
+</head>
+<body>
+    <h1>Hole Game</h1>
+    <div id="score">Score: 0</div>
+    <canvas id="gameCanvas" width="800" height="600"></canvas>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const scoreElement = document.getElementById('score');
+
+        // Game state
+        let score = 0;
+        let playerHole = {
+            x: canvas.width/2,
+            y: canvas.height/2,
+            radius: 20
+        };
+
+        let objects = [];
+        let aiHoles = [];
+        let isTouching = false;
+        let touchX = 0;
+        let touchY = 0;
+
+        // Touch handling
+        canvas.addEventListener('touchstart', (e) => {
+            isTouching = true;
+            const rect = canvas.getBoundingClientRect();
+            touchX = e.touches[0].clientX - rect.left;
+            touchY = e.touches[0].clientY - rect.top;
+            e.preventDefault();
+        });
+
+        canvas.addEventListener('touchmove', (e) => {
+            if (isTouching) {
+                const rect = canvas.getBoundingClientRect();
+                touchX = e.touches[0].clientX - rect.left;
+                touchY = e.touches[0].clientY - rect.top;
+                e.preventDefault();
+            }
+        });
+
+        canvas.addEventListener('touchend', () => {
+            isTouching = false;
+        });
+
+        // Create game objects
+        function createObjects() {
+            for(let i = 0; i < 50; i++) {
+                objects.push({
+                    x: Math.random() * canvas.width,
+                    y: Math.random() * canvas.height,
+                    size: Math.random() * 15 + 5,
+                    type: Math.random() < 0.5 ? 'tree' : 'car'
+                });
+            }
+        }
+
+        // Create AI opponents
+        function createAI() {
+            for(let i = 0; i < 3; i++) {
+                aiHoles.push({
+                    x: Math.random() * canvas.width,
+                    y: Math.random() * canvas.height,
+                    radius: 20,
+                    direction: Math.random() * Math.PI * 2,
+                    speed: 2
+                });
+            }
+        }
+
+        // Collision detection
+        function canSwallow(hole, obj) {
+            const dx = hole.x - obj.x;
+            const dy = hole.y - obj.y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            return distance < hole.radius - obj.size/2;
+        }
+
+        // Game loop
+        function update() {
+            // Move player toward touch position
+            if(isTouching) {
+                const dx = touchX - playerHole.x;
+                const dy = touchY - playerHole.y;
+                const distance = Math.sqrt(dx*dx + dy*dy);
+                
+                if(distance > 5) {
+                    const speed = Math.min(5, distance/10);
+                    playerHole.x += dx/distance * speed;
+                    playerHole.y += dy/distance * speed;
+                }
+            }
+
+            // Check collisions
+            objects = objects.filter(obj => {
+                if(canSwallow(playerHole, obj)) {
+                    playerHole.radius += obj.size * 0.1;
+                    score += Math.round(obj.size);
+                    scoreElement.textContent = `Score: ${score}`;
+                    return false;
+                }
+                return true;
+            });
+
+            // AI movement
+            aiHoles.forEach(ai => {
+                ai.x += Math.cos(ai.direction) * ai.speed;
+                ai.y += Math.sin(ai.direction) * ai.speed;
+                
+                if(Math.random() < 0.02) {
+                    ai.direction = Math.random() * Math.PI * 2;
+                }
+
+                objects = objects.filter(obj => {
+                    if(canSwallow(ai, obj)) {
+                        ai.radius += obj.size * 0.1;
+                        return false;
+                    }
+                    return true;
+                });
+            });
+
+            // Spawn new objects
+            if(objects.length < 30 && Math.random() < 0.1) {
+                objects.push({
+                    x: Math.random() * canvas.width,
+                    y: Math.random() * canvas.height,
+                    size: Math.random() * 15 + 5,
+                    type: Math.random() < 0.5 ? 'tree' : 'car'
+                });
+            }
+
+            // Keep player in bounds
+            playerHole.x = Math.max(playerHole.radius, Math.min(canvas.width - playerHole.radius, playerHole.x));
+            playerHole.y = Math.max(playerHole.radius, Math.min(canvas.height - playerHole.radius, playerHole.y));
+
+            draw();
+            requestAnimationFrame(update);
+        }
+
+        // Render game
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // Draw objects
+            objects.forEach(obj => {
+                ctx.fillStyle = obj.type === 'tree' ? '#2ecc71' : '#e74c3c';
+                ctx.fillRect(obj.x - obj.size/2, obj.y - obj.size/2, obj.size, obj.size);
+            });
+
+            // Draw player
+            ctx.beginPath();
+            ctx.arc(playerHole.x, playerHole.y, playerHole.radius, 0, Math.PI * 2);
+            ctx.fillStyle = 'black';
+            ctx.fill();
+
+            // Draw AI
+            aiHoles.forEach(ai => {
+                ctx.beginPath();
+                ctx.arc(ai.x, ai.y, ai.radius, 0, Math.PI * 2);
+                ctx.fillStyle = '#c0392b';
+                ctx.fill();
+            });
+        }
+
+        // Start game
+        createObjects();
+        createAI();
+        update();
+    </script>
+</body>
+</html>
